@@ -1,50 +1,55 @@
+import os
+import random
+import string
+import platform
 import streamlit as st
-import cv2
 import numpy as np
-#from PIL import Image
-from PIL import Image as Image, ImageOps as ImagOps
+from PIL import Image as PILImage
 from keras.models import load_model
 
-import platform
-
-# Muestra la versión de Python junto con detalles adicionales
+# Mostrar la versión de Python
 st.write("Versión de Python:", platform.python_version())
 
-model = load_model('keras_model.h5')
-data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+# Cargar modelo
+dir_path = os.path.dirname(__file__)
+model_path = os.path.join(dir_path, 'keras_model.h5')
+model = load_model(model_path)
 
-st.title("Reconocimiento de Imágenes")
-#st.write("Versión de Python:", platform.python_version())
-image = Image.open('OIG5.jpg')
-st.image(image, width=350)
+# Título
+st.title("Reconocimiento de Gestos de Mano")
+
 with st.sidebar:
-    st.subheader("Usando un modelo entrenado en teachable Machine puedes Usarlo en esta app para identificar")
-img_file_buffer = st.camera_input("Toma una Foto")
+    st.subheader("📷 Captura")
+    st.write("Usa la cámara para capturar el gesto de tu mano y el modelo predecirá si está abierta o cerrada.")
 
-if img_file_buffer is not None:
-    # To read image file buffer with OpenCV:
-    data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
-   #To read image file buffer as a PIL Image:
-    img = Image.open(img_file_buffer)
+# Input de cámara
+img_buffer = st.camera_input("Toma una foto:")
 
-    newsize = (224, 224)
-    img = img.resize(newsize)
-    # To convert PIL Image to numpy array:
-    img_array = np.array(img)
+if img_buffer is not None:
+    # Preprocesamiento de la imagen
+    img = PILImage.open(img_buffer).convert('RGB')
+    img = img.resize((224, 224))
+    img_array = np.array(img, dtype=np.float32)
+    normalized = (img_array / 127.5) - 1
+    data = normalized.reshape((1, 224, 224, 3))
 
-    # Normalize the image
-    normalized_image_array = (img_array.astype(np.float32) / 127.0) - 1
-    # Load the image into the array
-    data[0] = normalized_image_array
+    # Predicción
+    prediction = model.predict(data)[0]
+    open_prob, closed_prob = prediction[0], prediction[1]
 
-    # run the inference
-    prediction = model.predict(data)
-    print(prediction)
-    if prediction[0][0]>0.5:
-      st.header('Abierta, con Probabilidad: '+str( prediction[0][0]) )
-    if prediction[0][1]>0.5:
-      st.header('Cerrada, con Probabilidad: '+str( prediction[0][1]))
-    #if prediction[0][2]>0.5:
-    # st.header('Derecha, con Probabilidad: '+str( prediction[0][2]))
+    # Mostrar probabilidades
+    st.write(f"Probabilidad Mano Abierta: {open_prob:.2f}")
+    st.write(f"Probabilidad Mano Cerrada: {closed_prob:.2f}")
 
+    # Generar salida aleatoria
+    if open_prob > closed_prob:
+        # Mano abierta: letra aleatoria
+        letter = random.choice(string.ascii_uppercase)
+        st.header(f"✋ Mano Abierta → Letra: {letter}")
+    else:
+        # Mano cerrada: número aleatorio
+        number = random.randint(1, 100)
+        st.header(f"✊ Mano Cerrada → Número: {number}")
 
+    # Limpieza de archivos temporales (opcional)
+    # Aquí podrías eliminar imágenes temporales si las guardaste en disco
